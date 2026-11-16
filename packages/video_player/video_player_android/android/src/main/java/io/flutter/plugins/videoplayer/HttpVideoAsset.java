@@ -23,13 +23,16 @@ final class HttpVideoAsset extends VideoAsset {
   @NonNull private final StreamingFormat streamingFormat;
   @NonNull private final Map<String, String> httpHeaders;
   @Nullable private final String userAgent;
+  @Nullable private final String cacheKey;
 
   HttpVideoAsset(
       @Nullable String assetUrl,
       @NonNull StreamingFormat streamingFormat,
       @NonNull Map<String, String> httpHeaders,
-      @Nullable String userAgent) {
+      @Nullable String userAgent,
+      @Nullable String cacheKey) {
     super(assetUrl);
+    this.cacheKey = cacheKey;
     this.streamingFormat = streamingFormat;
     this.httpHeaders = httpHeaders;
     this.userAgent = userAgent;
@@ -54,6 +57,9 @@ final class HttpVideoAsset extends VideoAsset {
     if (mimeType != null) {
       builder.setMimeType(mimeType);
     }
+    if (cacheKey != null && !cacheKey.isEmpty()) {
+      builder.setCustomCacheKey(cacheKey);
+    }
     return builder.build();
   }
 
@@ -76,8 +82,10 @@ final class HttpVideoAsset extends VideoAsset {
   MediaSource.Factory getMediaSourceFactory(
       Context context, DefaultHttpDataSource.Factory initialFactory) {
     unstableUpdateDataSourceFactory(initialFactory, httpHeaders, userAgent);
-    DataSource.Factory dataSourceFactory = new DefaultDataSource.Factory(context, initialFactory);
-    return new DefaultMediaSourceFactory(context).setDataSourceFactory(dataSourceFactory);
+    DataSource.Factory upstreamFactory = new DefaultDataSource.Factory(context, initialFactory);
+    DataSource.Factory cacheDataSourceFactory =
+        VideoCacheManager.getInstance(context).createCacheDataSourceFactory(upstreamFactory);
+    return new DefaultMediaSourceFactory(context).setDataSourceFactory(cacheDataSourceFactory);
   }
 
   // TODO: Migrate to stable API, see https://github.com/flutter/flutter/issues/147039.

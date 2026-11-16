@@ -1,3 +1,9 @@
+## 2.13.0
+
+* Adds video pre-caching support backed by a shared Media3 `SimpleCache`, including
+  `precache`, `cancelPrecache`, `clearCache` and `DataSource.cacheKey`.
+* Updates `video_player_platform_interface` minimum to 6.10.0.
+
 ## 2.12.4
 
 * Fixes a minor native object leak when disposing a player instance.

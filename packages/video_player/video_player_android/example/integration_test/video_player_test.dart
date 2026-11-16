@@ -112,6 +112,34 @@ void main() {
     await player.dispose(playerId);
   });
 
+  testWidgets('supports pre-caching', (_) async {
+    expect(player.isPrecacheSupportAvailable(), isTrue);
+  });
+
+  testWidgets('can precache, cancel, clear and play a precached network video', (
+    WidgetTester tester,
+  ) async {
+    final dataSource = DataSource(
+      sourceType: DataSourceType.network,
+      uri: getUrlForAssetAsNetworkSource(_videoAssetKey),
+    );
+
+    await player.clearCache();
+    await player.precache(dataSource, maxCacheBytes: 256 * 1024);
+
+    // Cancelling when nothing is in flight is a no-op.
+    await player.cancelPrecache(dataSource);
+
+    final int playerId = (await player.create(dataSource))!;
+    await player.play(playerId);
+    await tester.pumpAndSettle(_playDuration);
+    await player.pause(playerId);
+    expect(await player.getPosition(playerId), greaterThan(Duration.zero));
+    await player.dispose(playerId);
+
+    await player.clearCache();
+  });
+
   testWidgets('can play a video from network', (WidgetTester tester) async {
     final int playerId = (await player.create(
       DataSource(

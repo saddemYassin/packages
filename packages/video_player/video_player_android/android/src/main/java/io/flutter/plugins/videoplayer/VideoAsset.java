@@ -34,6 +34,8 @@ public abstract class VideoAsset {
    * @param remoteUrl remote asset, i.e. typically beginning with {@code https://} or similar.
    * @param streamingFormat which streaming format, provided as a hint if able.
    * @param httpHeaders HTTP headers to set for a request.
+   * @param userAgent optional user agent.
+   * @param cacheKey optional custom cache key, used instead of the URL to index the disk cache.
    * @return the asset.
    */
   @NonNull
@@ -41,8 +43,10 @@ public abstract class VideoAsset {
       @Nullable String remoteUrl,
       @NonNull StreamingFormat streamingFormat,
       @NonNull Map<String, String> httpHeaders,
-      @Nullable String userAgent) {
-    return new HttpVideoAsset(remoteUrl, streamingFormat, new HashMap<>(httpHeaders), userAgent);
+      @Nullable String userAgent,
+      @Nullable String cacheKey) {
+    return new HttpVideoAsset(
+        remoteUrl, streamingFormat, new HashMap<>(httpHeaders), userAgent, cacheKey);
   }
 
   /**

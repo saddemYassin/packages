@@ -83,6 +83,25 @@ class CreationOptions {
   Map<String, String> httpHeaders;
   String? userAgent;
   int? backBufferDurationMs;
+  String? cacheKey;
+}
+
+/// Options for pre-caching a remote video to disk.
+class PrecacheOptions {
+  PrecacheOptions({
+    required this.uri,
+    required this.httpHeaders,
+    this.userAgent,
+    this.formatHint,
+    this.cacheKey,
+    this.maxCacheBytes,
+  });
+  String uri;
+  Map<String, String> httpHeaders;
+  String? userAgent;
+  PlatformVideoFormat? formatHint;
+  String? cacheKey;
+  int? maxCacheBytes;
 }
 
 class TexturePlayerIds {
@@ -202,6 +221,18 @@ abstract class AndroidVideoPlayerApi {
   void dispose(int playerId);
   void setMixWithOthers(bool mixWithOthers);
   String getLookupKeyForAsset(String asset, String? packageName);
+
+  /// Pre-caches the initial bytes of a remote video to disk, without creating
+  /// a player.
+  @asyncCallback
+  void precache(PrecacheOptions options);
+
+  /// Cancels an in-flight pre-cache operation, if any.
+  void cancelPrecache(String uri, String? cacheKey);
+
+  /// Removes all cached video data.
+  @asyncCallback
+  void clearCache();
 }
 
 @HostApi()

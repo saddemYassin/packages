@@ -5,6 +5,8 @@
 package io.flutter.plugins.videoplayer;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
@@ -30,7 +32,7 @@ import org.robolectric.RobolectricTestRunner;
  * Unit tests for {@link VideoAsset}.
  *
  * <p>This test suite <em>narrowly verifies</em> that the {@link VideoAsset} factory methods, {@link
- * VideoAsset#fromRemoteUrl(String, VideoAsset.StreamingFormat, Map)} and {@link
+ * VideoAsset#fromRemoteUrl(String, VideoAsset.StreamingFormat, Map, String, String)} and {@link
  * VideoAsset#fromAssetUrl(String)} follow the contract they have documented.
  *
  * <p>In other tests of the player, a fake asset is likely to be used.
@@ -69,7 +71,8 @@ public final class VideoAssetTest {
             "https://flutter.dev/video.mp4",
             VideoAsset.StreamingFormat.UNKNOWN,
             new HashMap<>(),
-            userAgent);
+            userAgent,
+            null);
 
     DefaultHttpDataSource.Factory mockFactory = mockHttpFactory();
 
@@ -92,6 +95,7 @@ public final class VideoAssetTest {
             "https://flutter.dev/video.mp4",
             VideoAsset.StreamingFormat.UNKNOWN,
             new HashMap<>(),
+            null,
             null);
 
     MediaSource source =
@@ -110,7 +114,11 @@ public final class VideoAssetTest {
 
     VideoAsset asset =
         VideoAsset.fromRemoteUrl(
-            "https://flutter.dev/video.mp4", VideoAsset.StreamingFormat.UNKNOWN, headers, null);
+            "https://flutter.dev/video.mp4",
+            VideoAsset.StreamingFormat.UNKNOWN,
+            headers,
+            null,
+            null);
 
     DefaultHttpDataSource.Factory mockFactory = mockHttpFactory();
 
@@ -120,6 +128,51 @@ public final class VideoAssetTest {
 
     verify(mockFactory).setAllowCrossProtocolRedirects(true);
     verify(mockFactory).setDefaultRequestProperties(headers);
+  }
+
+  @Test
+  public void remoteVideoSetsCustomCacheKeyOnMediaItem() {
+    VideoAsset asset =
+        VideoAsset.fromRemoteUrl(
+            "https://flutter.dev/video.mp4?token=abc",
+            VideoAsset.StreamingFormat.UNKNOWN,
+            new HashMap<>(),
+            null,
+            "stable-key");
+
+    assertEquals("stable-key", asset.getMediaItem().localConfiguration.customCacheKey);
+  }
+
+  @Test
+  public void remoteVideoWithoutCacheKeyLeavesCustomCacheKeyUnset() {
+    VideoAsset asset =
+        VideoAsset.fromRemoteUrl(
+            "https://flutter.dev/video.mp4",
+            VideoAsset.StreamingFormat.UNKNOWN,
+            new HashMap<>(),
+            null,
+            null);
+
+    assertNull(asset.getMediaItem().localConfiguration.customCacheKey);
+  }
+
+  @Test
+  public void remoteVideoMediaSourceUsesCacheDataSourceFactory() {
+    VideoAsset asset =
+        VideoAsset.fromRemoteUrl(
+            "https://flutter.dev/video.mp4",
+            VideoAsset.StreamingFormat.UNKNOWN,
+            new HashMap<>(),
+            null,
+            null);
+
+    MediaSource.Factory factory =
+        ((HttpVideoAsset) asset)
+            .getMediaSourceFactory(ApplicationProvider.getApplicationContext(), mockHttpFactory());
+
+    assertNotNull(factory);
+    assertNotNull(
+        VideoCacheManager.getInstance(ApplicationProvider.getApplicationContext()).getCache());
   }
 
   @Test

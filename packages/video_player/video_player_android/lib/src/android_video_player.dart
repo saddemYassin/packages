@@ -104,6 +104,7 @@ class AndroidVideoPlayer extends VideoPlayerPlatform {
       userAgent: userAgent,
       formatHint: formatHint,
       backBufferDurationMs: options.videoPlayerOptions?.backBufferDurationMs,
+      cacheKey: dataSource.cacheKey,
     );
 
     final int playerId;
@@ -291,6 +292,46 @@ class AndroidVideoPlayer extends VideoPlayerPlatform {
   bool isVideoTrackSupportAvailable() {
     // Android with ExoPlayer supports video track selection
     return true;
+  }
+
+  @override
+  bool isPrecacheSupportAvailable() => true;
+
+  @override
+  Future<void> precache(DataSource dataSource, {int? maxCacheBytes}) {
+    final String uri = _networkUriOrThrow(dataSource, 'precache');
+    if (maxCacheBytes != null && maxCacheBytes <= 0) {
+      throw ArgumentError.value(maxCacheBytes, 'maxCacheBytes', 'Must be greater than zero.');
+    }
+    return _api.precache(
+      PrecacheOptions(
+        uri: uri,
+        httpHeaders: dataSource.httpHeaders,
+        userAgent: _userAgentFromHeaders(dataSource.httpHeaders),
+        formatHint: _platformVideoFormatFromVideoFormat(dataSource.formatHint),
+        cacheKey: dataSource.cacheKey,
+        maxCacheBytes: maxCacheBytes,
+      ),
+    );
+  }
+
+  @override
+  Future<void> cancelPrecache(DataSource dataSource) {
+    final String uri = _networkUriOrThrow(dataSource, 'cancelPrecache');
+    return _api.cancelPrecache(uri, dataSource.cacheKey);
+  }
+
+  @override
+  Future<void> clearCache() => _api.clearCache();
+
+  String _networkUriOrThrow(DataSource dataSource, String method) {
+    final String? uri = dataSource.uri;
+    if (dataSource.sourceType != DataSourceType.network || uri == null) {
+      throw ArgumentError(
+        '$method() requires a network data source with a non-null uri, but got $dataSource',
+      );
+    }
+    return uri;
   }
 
   _PlayerInstance _playerWith({required int id}) {

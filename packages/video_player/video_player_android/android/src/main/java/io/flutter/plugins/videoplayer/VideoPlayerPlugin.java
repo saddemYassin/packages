@@ -5,10 +5,13 @@
 package io.flutter.plugins.videoplayer;
 
 import android.content.Context;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.LongSparseArray;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.OptIn;
+import androidx.annotation.VisibleForTesting;
 import androidx.media3.common.util.UnstableApi;
 import io.flutter.FlutterInjector;
 import io.flutter.Log;
@@ -18,12 +21,16 @@ import io.flutter.plugins.videoplayer.platformview.PlatformVideoViewFactory;
 import io.flutter.plugins.videoplayer.platformview.PlatformViewVideoPlayer;
 import io.flutter.plugins.videoplayer.texture.TextureVideoPlayer;
 import io.flutter.view.TextureRegistry;
+import kotlin.Result;
+import kotlin.Unit;
+import kotlin.jvm.functions.Function1;
 
 /** Android platform implementation of the VideoPlayerPlugin. */
 public class VideoPlayerPlugin implements FlutterPlugin, AndroidVideoPlayerApi {
   private static final String TAG = "VideoPlayerPlugin";
   private final LongSparseArray<VideoPlayer> videoPlayers = new LongSparseArray<>();
   private FlutterState flutterState;
+  @Nullable private VideoCacheManager cacheManagerOverride;
   private final VideoPlayerOptions sharedOptions = new VideoPlayerOptions();
   private long nextPlayerIdentifier = 1;
 
@@ -131,24 +138,30 @@ public class VideoPlayerPlugin implements FlutterPlugin, AndroidVideoPlayerApi {
     } else if (uri.startsWith("rtsp:")) {
       return VideoAsset.fromRtspUrl(uri);
     } else {
-      VideoAsset.StreamingFormat streamingFormat = VideoAsset.StreamingFormat.UNKNOWN;
-      PlatformVideoFormat formatHint = options.getFormatHint();
-      if (formatHint != null) {
-        switch (formatHint) {
-          case SS:
-            streamingFormat = VideoAsset.StreamingFormat.SMOOTH;
-            break;
-          case DASH:
-            streamingFormat = VideoAsset.StreamingFormat.DYNAMIC_ADAPTIVE;
-            break;
-          case HLS:
-            streamingFormat = VideoAsset.StreamingFormat.HTTP_LIVE;
-            break;
-        }
-      }
+      VideoAsset.StreamingFormat streamingFormat = streamingFormatFor(options.getFormatHint());
       return VideoAsset.fromRemoteUrl(
-          uri, streamingFormat, options.getHttpHeaders(), options.getUserAgent());
+          uri,
+          streamingFormat,
+          options.getHttpHeaders(),
+          options.getUserAgent(),
+          options.getCacheKey());
     }
+  }
+
+  private static @NonNull VideoAsset.StreamingFormat streamingFormatFor(
+      @Nullable PlatformVideoFormat formatHint) {
+    if (formatHint == null) {
+      return VideoAsset.StreamingFormat.UNKNOWN;
+    }
+    switch (formatHint) {
+      case SS:
+        return VideoAsset.StreamingFormat.SMOOTH;
+      case DASH:
+        return VideoAsset.StreamingFormat.DYNAMIC_ADAPTIVE;
+      case HLS:
+        return VideoAsset.StreamingFormat.HTTP_LIVE;
+    }
+    return VideoAsset.StreamingFormat.UNKNOWN;
   }
 
   private void registerPlayerInstance(VideoPlayer player, long id) {
@@ -196,6 +209,61 @@ public class VideoPlayerPlugin implements FlutterPlugin, AndroidVideoPlayerApi {
     return packageName == null
         ? flutterState.keyForAsset.get(asset)
         : flutterState.keyForAssetAndPackageName.get(asset, packageName);
+  }
+
+  @Override
+  public void precache(
+      @NonNull PrecacheOptions options, @NonNull Function1<? super Result<Unit>, Unit> callback) {
+    getCacheManager()
+        .precache(
+            options.getUri(),
+            options.getHttpHeaders(),
+            options.getUserAgent(),
+            streamingFormatFor(options.getFormatHint()),
+            options.getCacheKey(),
+            options.getMaxCacheBytes(),
+            completing(callback));
+  }
+
+  @Override
+  public void cancelPrecache(@NonNull String uri, @Nullable String cacheKey) {
+    getCacheManager().cancelPrecache(uri, cacheKey);
+  }
+
+  @Override
+  public void clearCache(@NonNull Function1<? super Result<Unit>, Unit> callback) {
+    getCacheManager().clearCache(completing(callback));
+  }
+
+  @NonNull
+  private VideoCacheManager getCacheManager() {
+    if (cacheManagerOverride != null) {
+      return cacheManagerOverride;
+    }
+    return VideoCacheManager.getInstance(flutterState.applicationContext);
+  }
+
+  /** Replaces the cache manager. Visible for testing. */
+  @VisibleForTesting
+  void setCacheManagerForTesting(@Nullable VideoCacheManager cacheManager) {
+    this.cacheManagerOverride = cacheManager;
+  }
+
+  /** Returns a callback that completes {@code callback} on the platform thread. */
+  private static VideoCacheManager.Callback completing(
+      @NonNull Function1<? super Result<Unit>, Unit> callback) {
+    final Handler mainHandler = new Handler(Looper.getMainLooper());
+    return new VideoCacheManager.Callback() {
+      @Override
+      public void onSuccess() {
+        mainHandler.post(() -> ResultCallbacks.success(callback));
+      }
+
+      @Override
+      public void onError(@NonNull Throwable error) {
+        mainHandler.post(() -> ResultCallbacks.failure(callback, error));
+      }
+    };
   }
 
   private interface KeyForAssetFn {

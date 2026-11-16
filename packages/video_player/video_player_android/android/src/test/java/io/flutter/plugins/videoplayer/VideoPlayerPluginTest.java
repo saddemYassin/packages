@@ -82,6 +82,7 @@ public class VideoPlayerPluginTest {
               null,
               new HashMap<>(),
               null,
+              null,
               null);
 
       final long playerId = plugin.createForPlatformView(options);
@@ -105,6 +106,7 @@ public class VideoPlayerPluginTest {
               null,
               new HashMap<>(),
               null,
+              null,
               null);
 
       final TexturePlayerIds ids = plugin.createForTextureView(options);
@@ -112,5 +114,53 @@ public class VideoPlayerPluginTest {
       final LongSparseArray<VideoPlayer> videoPlayers = getVideoPlayers();
       assertTrue(videoPlayers.get(ids.getPlayerId()) instanceof TextureVideoPlayer);
     }
+  }
+
+  @Test
+  public void precacheForwardsOptionsToCacheManager() {
+    final VideoCacheManager manager = mock(VideoCacheManager.class);
+    plugin.setCacheManagerForTesting(manager);
+    final HashMap<String, String> headers = new HashMap<>();
+    headers.put("Authorization", "token");
+
+    plugin.precache(
+        new PrecacheOptions(
+            "https://example.com/video.m3u8?sig=1",
+            headers,
+            "UA",
+            PlatformVideoFormat.HLS,
+            "key",
+            1024L),
+        result -> kotlin.Unit.INSTANCE);
+
+    verify(manager)
+        .precache(
+            eq("https://example.com/video.m3u8?sig=1"),
+            eq(headers),
+            eq("UA"),
+            eq(VideoAsset.StreamingFormat.HTTP_LIVE),
+            eq("key"),
+            eq(1024L),
+            any(VideoCacheManager.Callback.class));
+  }
+
+  @Test
+  public void cancelPrecacheForwardsToCacheManager() {
+    final VideoCacheManager manager = mock(VideoCacheManager.class);
+    plugin.setCacheManagerForTesting(manager);
+
+    plugin.cancelPrecache("https://example.com/video.mp4", "key");
+
+    verify(manager).cancelPrecache("https://example.com/video.mp4", "key");
+  }
+
+  @Test
+  public void clearCacheForwardsToCacheManager() {
+    final VideoCacheManager manager = mock(VideoCacheManager.class);
+    plugin.setCacheManagerForTesting(manager);
+
+    plugin.clearCache(result -> kotlin.Unit.INSTANCE);
+
+    verify(manager).clearCache(any(VideoCacheManager.Callback.class));
   }
 }

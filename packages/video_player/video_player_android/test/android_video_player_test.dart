@@ -1177,4 +1177,128 @@ void main() {
       });
     });
   });
+
+  group('precaching', () {
+    test('isPrecacheSupportAvailable returns true', () {
+      final (AndroidVideoPlayer player, _, _) = setUpMockPlayer(playerId: 1);
+      expect(player.isPrecacheSupportAvailable(), isTrue);
+    });
+
+    test('precache translates DataSource to PrecacheOptions', () async {
+      final (AndroidVideoPlayer player, MockAndroidVideoPlayerApi api, _) = setUpMockPlayer(
+        playerId: 1,
+      );
+
+      await player.precache(
+        DataSource(
+          sourceType: DataSourceType.network,
+          uri: 'https://example.com/video.m3u8?sig=1',
+          formatHint: VideoFormat.hls,
+          httpHeaders: const <String, String>{'Authorization': 'token'},
+          cacheKey: 'stable',
+        ),
+        maxCacheBytes: 1024,
+      );
+
+      final VerificationResult verification = verify(api.precache(captureAny));
+      final options = verification.captured.single as PrecacheOptions;
+      expect(options.uri, 'https://example.com/video.m3u8?sig=1');
+      expect(options.httpHeaders['Authorization'], 'token');
+      expect(options.userAgent, 'ExoPlayer');
+      expect(options.formatHint, PlatformVideoFormat.hls);
+      expect(options.cacheKey, 'stable');
+      expect(options.maxCacheBytes, 1024);
+    });
+
+    test('precache leaves optional values null by default', () async {
+      final (AndroidVideoPlayer player, MockAndroidVideoPlayerApi api, _) = setUpMockPlayer(
+        playerId: 1,
+      );
+
+      await player.precache(
+        DataSource(sourceType: DataSourceType.network, uri: 'https://example.com/video.mp4'),
+      );
+
+      final VerificationResult verification = verify(api.precache(captureAny));
+      final options = verification.captured.single as PrecacheOptions;
+      expect(options.cacheKey, isNull);
+      expect(options.maxCacheBytes, isNull);
+      expect(options.formatHint, isNull);
+    });
+
+    test('precache rejects non-network data sources', () {
+      final (AndroidVideoPlayer player, _, _) = setUpMockPlayer(playerId: 1);
+
+      expect(
+        () => player.precache(DataSource(sourceType: DataSourceType.asset, asset: 'a.mp4')),
+        throwsArgumentError,
+      );
+      expect(
+        () => player.precache(DataSource(sourceType: DataSourceType.network)),
+        throwsArgumentError,
+      );
+    });
+
+    test('precache rejects non-positive maxCacheBytes', () {
+      final (AndroidVideoPlayer player, _, _) = setUpMockPlayer(playerId: 1);
+
+      expect(
+        () => player.precache(
+          DataSource(sourceType: DataSourceType.network, uri: 'https://example.com/video.mp4'),
+          maxCacheBytes: 0,
+        ),
+        throwsArgumentError,
+      );
+    });
+
+    test('cancelPrecache forwards uri and cacheKey', () async {
+      final (AndroidVideoPlayer player, MockAndroidVideoPlayerApi api, _) = setUpMockPlayer(
+        playerId: 1,
+      );
+
+      await player.cancelPrecache(
+        DataSource(
+          sourceType: DataSourceType.network,
+          uri: 'https://example.com/video.mp4',
+          cacheKey: 'stable',
+        ),
+      );
+
+      verify(api.cancelPrecache('https://example.com/video.mp4', 'stable'));
+    });
+
+    test('clearCache forwards to the host API', () async {
+      final (AndroidVideoPlayer player, MockAndroidVideoPlayerApi api, _) = setUpMockPlayer(
+        playerId: 1,
+      );
+
+      await player.clearCache();
+
+      verify(api.clearCache());
+    });
+
+    test('createWithOptions passes cacheKey to CreationOptions', () async {
+      final (AndroidVideoPlayer player, MockAndroidVideoPlayerApi api, _) = setUpMockPlayer(
+        playerId: 1,
+        textureId: 100,
+      );
+      when(
+        api.createForTextureView(any),
+      ).thenAnswer((_) async => TexturePlayerIds(playerId: 2, textureId: 100));
+
+      await player.createWithOptions(
+        VideoCreationOptions(
+          dataSource: DataSource(
+            sourceType: DataSourceType.network,
+            uri: 'https://example.com/video.mp4?sig=1',
+            cacheKey: 'stable',
+          ),
+          viewType: VideoViewType.textureView,
+        ),
+      );
+
+      final VerificationResult verification = verify(api.createForTextureView(captureAny));
+      expect((verification.captured.single as CreationOptions).cacheKey, 'stable');
+    });
+  });
 }
