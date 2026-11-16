@@ -50,6 +50,69 @@ void main() {
     expect(initialInstance.isVideoTrackSupportAvailable(), false);
   });
 
+  group('precaching', () {
+    final network = DataSource(
+      sourceType: DataSourceType.network,
+      uri: 'https://example.com/a.mp4',
+    );
+
+    test('default precache throws unimplemented', () async {
+      await expectLater(
+        () => initialInstance.precache(network),
+        throwsA(
+          isA<UnimplementedError>().having(
+            (UnimplementedError e) => e.message,
+            'message',
+            'precache() has not been implemented.',
+          ),
+        ),
+      );
+    });
+
+    test('default cancelPrecache throws unimplemented', () async {
+      await expectLater(
+        () => initialInstance.cancelPrecache(network),
+        throwsA(
+          isA<UnimplementedError>().having(
+            (UnimplementedError e) => e.message,
+            'message',
+            'cancelPrecache() has not been implemented.',
+          ),
+        ),
+      );
+    });
+
+    test('default clearCache throws unimplemented', () async {
+      await expectLater(
+        () => initialInstance.clearCache(),
+        throwsA(
+          isA<UnimplementedError>().having(
+            (UnimplementedError e) => e.message,
+            'message',
+            'clearCache() has not been implemented.',
+          ),
+        ),
+      );
+    });
+
+    test('default isPrecacheSupportAvailable returns false', () {
+      expect(initialInstance.isPrecacheSupportAvailable(), false);
+    });
+
+    test('DataSource cacheKey defaults to null', () {
+      expect(network.cacheKey, isNull);
+    });
+
+    test('DataSource preserves cacheKey', () {
+      final keyed = DataSource(
+        sourceType: DataSourceType.network,
+        uri: 'https://example.com/a.mp4?token=1',
+        cacheKey: 'a',
+      );
+      expect(keyed.cacheKey, 'a');
+    });
+  });
+
   group('VideoTrack', () {
     test('constructor creates instance with required fields', () {
       const track = VideoTrack(id: 'track_1', isSelected: true);

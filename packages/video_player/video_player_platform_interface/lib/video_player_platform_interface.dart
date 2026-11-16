@@ -195,6 +195,39 @@ abstract class VideoPlayerPlatform extends PlatformInterface {
   bool isVideoTrackSupportAvailable() {
     return false;
   }
+
+  /// Pre-caches up to [maxCacheBytes] of the given [dataSource] to disk
+  /// without allocating a video player instance or hardware decoder.
+  ///
+  /// When [maxCacheBytes] is null, the platform implementation chooses a
+  /// default prefetch size suitable for instant playback startup.
+  Future<void> precache(DataSource dataSource, {int? maxCacheBytes}) {
+    throw UnimplementedError('precache() has not been implemented.');
+  }
+
+  /// Cancels an active pre-cache operation for the given [dataSource].
+  ///
+  /// The operation is identified by the [DataSource.uri] and optional
+  /// [DataSource.cacheKey] of [dataSource].
+  Future<void> cancelPrecache(DataSource dataSource) {
+    throw UnimplementedError('cancelPrecache() has not been implemented.');
+  }
+
+  /// Clears all cached video data stored by this platform implementation.
+  ///
+  /// The returned future completes once cache cleanup finishes.
+  Future<void> clearCache() {
+    throw UnimplementedError('clearCache() has not been implemented.');
+  }
+
+  /// Returns whether video pre-caching is supported on this platform.
+  ///
+  /// The default implementation returns `false`. Platform implementations
+  /// should override this to return `true` if they support [precache],
+  /// [cancelPrecache], and [clearCache].
+  bool isPrecacheSupportAvailable() {
+    return false;
+  }
 }
 
 class _PlaceholderImplementation extends VideoPlayerPlatform {}
@@ -222,6 +255,7 @@ class DataSource {
     this.asset,
     this.package,
     this.httpHeaders = const <String, String>{},
+    this.cacheKey,
   });
 
   /// The way in which the video was originally loaded.
@@ -251,6 +285,12 @@ class DataSource {
   /// The package that the asset was loaded from. Only set for
   /// [DataSourceType.asset] videos.
   final String? package;
+
+  /// An optional stable key used to identify this video in the platform cache.
+  ///
+  /// Useful when [uri] contains rotating tokens or expiring query parameters.
+  /// When null, platform implementations default to using [uri].
+  final String? cacheKey;
 }
 
 /// The way in which the video was originally loaded.

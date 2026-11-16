@@ -1,5 +1,6 @@
-## NEXT
+## 6.10.0
 
+* Adds `precache`, `cancelPrecache`, `clearCache`, and `isPrecacheSupportAvailable` to `VideoPlayerPlatform`, and `cacheKey` to `DataSource`.
 * Updates minimum supported SDK version to Flutter 3.44/Dart 3.12.
 
 ## 6.9.0
